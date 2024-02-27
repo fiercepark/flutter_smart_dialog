@@ -74,9 +74,7 @@ class DialogProxy {
     if (status == SmartStatus.smart) {
       var loading = config.loading.isExist;
 
-      if (loading &&
-          tag == 'loading' &&
-          (tag == null || (dialogQueue.isEmpty && notifyQueue.isEmpty))) {
+      if (loading && tag == 'loading') {
         return _loading.dismiss(closeType: closeType);
       }
 
