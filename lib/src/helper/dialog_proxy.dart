@@ -31,34 +31,23 @@ enum CloseType {
   normal,
 }
 
-enum DialogType {
-  dialog,
-  custom,
-  attach,
-  notify,
-  allDialog,
-  allCustom,
-  allAttach,
-  allNotify,
-}
-
 class DialogProxy {
-  late SmartConfig config;
-  late SmartOverlayEntry entryLoading;
-  late SmartOverlayEntry entryNotify;
-  late Queue<DialogInfo> dialogQueue;
-  late Queue<NotifyInfo> notifyQueue;
-  late CustomLoading _loading;
-
   static DialogProxy? _instance;
-
-  static DialogProxy get instance => _instance ??= DialogProxy._internal();
-
   static late BuildContext contextCustom;
   static late BuildContext contextAttach;
   static late BuildContext contextNotify;
   static late BuildContext contextToast;
   static BuildContext? contextNavigator;
+
+  static DialogProxy get instance => _instance ??= DialogProxy._internal();
+
+  late SmartConfig config;
+
+  late SmartOverlayEntry entryLoading;
+  late SmartOverlayEntry entryNotify;
+  late Queue<DialogInfo> dialogQueue;
+  late Queue<NotifyInfo> notifyQueue;
+  late CustomLoading _loading;
 
   ///set default loading widget
   late FlutterSmartLoadingBuilder loadingBuilder;
@@ -73,6 +62,79 @@ class DialogProxy {
     config = SmartConfig();
     dialogQueue = ListQueue();
     notifyQueue = ListQueue();
+  }
+
+  Future<void>? dismiss<T>({
+    required SmartStatus status,
+    String? tag,
+    T? result,
+    bool force = false,
+    CloseType closeType = CloseType.normal,
+  }) {
+    if (status == SmartStatus.smart) {
+      var loading = config.loading.isExist;
+
+      if (loading &&
+          tag == 'loading' &&
+          (tag == null || (dialogQueue.isEmpty && notifyQueue.isEmpty))) {
+        return _loading.dismiss(closeType: closeType);
+      }
+
+      if (notifyQueue.isNotEmpty) {
+        bool useNotify = (tag == null);
+        if (tag != null) {
+          for (var element in notifyQueue) {
+            if (element.tag == tag) {
+              useNotify = true;
+            }
+          }
+        }
+        if (useNotify) {
+          return CustomNotify.dismiss<T>(
+            type: DialogType.notify,
+            tag: tag,
+            result: result,
+            force: force,
+            closeType: closeType,
+          );
+        }
+      }
+
+      if (dialogQueue.isNotEmpty) {
+        return CustomDialog.dismiss<T>(
+          type: DialogType.dialog,
+          tag: tag,
+          result: result,
+          force: force,
+          closeType: closeType,
+        );
+      }
+    } else if (status == SmartStatus.toast) {
+      return CustomToast.dismiss();
+    } else if (status == SmartStatus.allToast) {
+      return CustomToast.dismiss(closeAll: true);
+    } else if (status == SmartStatus.loading) {
+      return _loading.dismiss(closeType: closeType);
+    } else if (status == SmartStatus.notify ||
+        status == SmartStatus.allNotify) {
+      return CustomNotify.dismiss<T>(
+        type: _convertEnum(status)!,
+        tag: tag,
+        result: result,
+        force: force,
+        closeType: closeType,
+      );
+    }
+
+    DialogType? type = _convertEnum(status);
+    if (type == null) return null;
+    return CustomDialog.dismiss<T>(
+      type: type,
+      tag: tag,
+      result: result,
+      force: force,
+      closeType: closeType,
+    );
   }
 
   void initialize(Set<SmartInitType> initType) {
@@ -140,53 +202,6 @@ class DialogProxy {
       bindPage: bindPage,
       bindWidget: bindWidget,
       ignoreArea: ignoreArea,
-    );
-  }
-
-  Future<T?> showNotify<T>({
-    required Widget widget,
-    required Alignment alignment,
-    required bool usePenetrate,
-    required bool useAnimation,
-    required Duration animationTime,
-    required SmartAnimationType animationType,
-    required List<SmartNonAnimationType> nonAnimationTypes,
-    required AnimationBuilder? animationBuilder,
-    required Color maskColor,
-    required bool clickMaskDismiss,
-    required Widget? maskWidget,
-    required bool debounce,
-    required VoidCallback? onDismiss,
-    required VoidCallback? onMask,
-    required Duration? displayTime,
-    required String? tag,
-    required bool keepSingle,
-    required SmartBackType backType,
-  }) {
-    CustomNotify? dialog;
-    var entry = SmartOverlayEntry(
-      builder: (BuildContext context) => dialog!.getWidget(),
-    );
-    dialog = CustomNotify(overlayEntry: entry);
-    return dialog.showNotify<T>(
-      widget: widget,
-      alignment: alignment,
-      usePenetrate: usePenetrate,
-      useAnimation: useAnimation,
-      animationTime: animationTime,
-      animationType: animationType,
-      nonAnimationTypes: nonAnimationTypes,
-      animationBuilder: animationBuilder,
-      maskColor: maskColor,
-      maskWidget: maskWidget,
-      clickMaskDismiss: clickMaskDismiss,
-      debounce: debounce,
-      onDismiss: onDismiss,
-      onMask: onMask,
-      displayTime: displayTime,
-      tag: tag,
-      keepSingle: keepSingle,
-      backType: backType,
     );
   }
 
@@ -293,6 +308,53 @@ class DialogProxy {
     );
   }
 
+  Future<T?> showNotify<T>({
+    required Widget widget,
+    required Alignment alignment,
+    required bool usePenetrate,
+    required bool useAnimation,
+    required Duration animationTime,
+    required SmartAnimationType animationType,
+    required List<SmartNonAnimationType> nonAnimationTypes,
+    required AnimationBuilder? animationBuilder,
+    required Color maskColor,
+    required bool clickMaskDismiss,
+    required Widget? maskWidget,
+    required bool debounce,
+    required VoidCallback? onDismiss,
+    required VoidCallback? onMask,
+    required Duration? displayTime,
+    required String? tag,
+    required bool keepSingle,
+    required SmartBackType backType,
+  }) {
+    CustomNotify? dialog;
+    var entry = SmartOverlayEntry(
+      builder: (BuildContext context) => dialog!.getWidget(),
+    );
+    dialog = CustomNotify(overlayEntry: entry);
+    return dialog.showNotify<T>(
+      widget: widget,
+      alignment: alignment,
+      usePenetrate: usePenetrate,
+      useAnimation: useAnimation,
+      animationTime: animationTime,
+      animationType: animationType,
+      nonAnimationTypes: nonAnimationTypes,
+      animationBuilder: animationBuilder,
+      maskColor: maskColor,
+      maskWidget: maskWidget,
+      clickMaskDismiss: clickMaskDismiss,
+      debounce: debounce,
+      onDismiss: onDismiss,
+      onMask: onMask,
+      displayTime: displayTime,
+      tag: tag,
+      keepSingle: keepSingle,
+      backType: backType,
+    );
+  }
+
   Future<void> showToast({
     required Alignment alignment,
     required bool clickMaskDismiss,
@@ -337,78 +399,6 @@ class DialogProxy {
     );
   }
 
-  Future<void>? dismiss<T>({
-    required SmartStatus status,
-    String? tag,
-    T? result,
-    bool force = false,
-    CloseType closeType = CloseType.normal,
-  }) {
-    if (status == SmartStatus.smart) {
-      var loading = config.loading.isExist;
-
-      if (loading &&
-          (tag == null || (dialogQueue.isEmpty && notifyQueue.isEmpty))) {
-        return _loading.dismiss(closeType: closeType);
-      }
-
-      if (notifyQueue.isNotEmpty) {
-        bool useNotify = (tag == null);
-        if (tag != null) {
-          for (var element in notifyQueue) {
-            if (element.tag == tag) {
-              useNotify = true;
-            }
-          }
-        }
-        if (useNotify) {
-          return CustomNotify.dismiss<T>(
-            type: DialogType.notify,
-            tag: tag,
-            result: result,
-            force: force,
-            closeType: closeType,
-          );
-        }
-      }
-
-      if (dialogQueue.isNotEmpty) {
-        return CustomDialog.dismiss<T>(
-          type: DialogType.dialog,
-          tag: tag,
-          result: result,
-          force: force,
-          closeType: closeType,
-        );
-      }
-    } else if (status == SmartStatus.toast) {
-      return CustomToast.dismiss();
-    } else if (status == SmartStatus.allToast) {
-      return CustomToast.dismiss(closeAll: true);
-    } else if (status == SmartStatus.loading) {
-      return _loading.dismiss(closeType: closeType);
-    } else if (status == SmartStatus.notify ||
-        status == SmartStatus.allNotify) {
-      return CustomNotify.dismiss<T>(
-        type: _convertEnum(status)!,
-        tag: tag,
-        result: result,
-        force: force,
-        closeType: closeType,
-      );
-    }
-
-    DialogType? type = _convertEnum(status);
-    if (type == null) return null;
-    return CustomDialog.dismiss<T>(
-      type: type,
-      tag: tag,
-      result: result,
-      force: force,
-      closeType: closeType,
-    );
-  }
-
   DialogType? _convertEnum(SmartStatus status) {
     if (status == SmartStatus.dialog) {
       return DialogType.dialog;
@@ -429,4 +419,15 @@ class DialogProxy {
     }
     return null;
   }
+}
+
+enum DialogType {
+  dialog,
+  custom,
+  attach,
+  notify,
+  allDialog,
+  allCustom,
+  allAttach,
+  allNotify,
 }
